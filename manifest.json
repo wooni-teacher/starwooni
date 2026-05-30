@@ -1,0 +1,25 @@
+{
+  "name": "슷하 & 우니 생활 기록",
+  "short_name": "슷하&우니",
+  "description": "슷하와 우니의 지출 & 운동 기록 앱",
+  "start_url": "/starwooni/",
+  "scope": "/starwooni/",
+  "display": "standalone",
+  "background_color": "#fce4ec",
+  "theme_color": "#e91e8c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

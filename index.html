@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>슷하 & 우니 생활 기록</title>
+<!-- 앱 타이틀 아래에 추가 -->
+<div id="install-banner" style="display:none; text-align:center; margin-bottom:16px;">
+  <button id="install-btn" style="
+    background:linear-gradient(135deg,#f48fb1,#e91e8c);
+    color:white; border:none; border-radius:30px;
+    padding:10px 28px; font-size:0.95rem; font-weight:700;
+    cursor:pointer; box-shadow:0 4px 15px rgba(233,30,140,0.3);
+  ">
+    📲 홈화면에 앱 설치하기
+  </button>
+</div>
+
+<script>
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('install-banner').style.display = 'block';
+  });
+  document.getElementById('install-btn')?.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      document.getElementById('install-banner').style.display = 'none';
+    }
+    deferredPrompt = null;
+  });
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('install-banner').style.display = 'none';
+  });
+</script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+            background:linear-gradient(135deg,#fce4ec 0%,#f3e5f5 25%,#e8eaf6 50%,#e0f2f1 75%,#fff9c4 100%);
+            min-height:100vh; padding:20px; overflow-x:hidden;
+        }
+        #particle-canvas { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; }
+
+        /* 연결 상태 */
+        #connection-status {
+            position:fixed; bottom:20px; right:20px;
+            display:flex; align-items:center; gap:8px;
+            background:rgba(255,255,255,0.95); backdrop-filter:blur(8px);
+            border-radius:30px; padding:8px 16px;
+            box-shadow:0 4px 16px rgba(0,0,0,0.12);
+            z-index:9000; font-size:0.82rem; font-weight:600; transition:all 0.4s ease;
+        }
+        .conn-dot { width:10px; height:10px; border-radius:50%; transition:background 0.4s; }
+        .conn-dot.online  { background:#43a047; animation:pulse-green 1.5s infinite; }
+        .conn-dot.offline { background:#e53935; }
+        .conn-dot.syncing { background:#fb8c00; animation:pulse-orange 0.6s infinite; }
+        @keyframes pulse-green  { 0%,100%{box-shadow:0 0 0 3px rgba(67,160,71,0.25)}  50%{box-shadow:0 0 0 7px rgba(67,160,71,0.08)} }
+        @keyframes pulse-orange { 0%,100%{box-shadow:0 0 0 3px rgba(251,140,0,0.3)}   50%{box-shadow:0 0 0 7px rgba(251,140,0,0.08)} }
+
+        .app-container { max-width:960px; margin:0 auto; position:relative; z-index:1; }
+        .app-title { text-align:center; font-size:2rem; font-weight:700; color:#7b5ea7; margin-bottom:24px; letter-spacing:2px; }
+        .app-title span { color:#e91e8c; }
+
+        .top-tabs { display:flex; gap:10px; margin-bottom:20px; justify-content:center; flex-wrap:wrap; }
+        .top-tab-btn { padding:12px 32px; border:none; border-radius:30px; font-size:1.1rem; font-weight:600; cursor:pointer; transition:all 0.3s; box-shadow:0 3px 10px rgba(0,0,0,0.1); }
+        .top-tab-btn.seutha { background:linear-gradient(135deg,#f8bbd0,#f48fb1); color:#880e4f; }
+        .top-tab-btn.seutha:hover,.top-tab-btn.seutha.active { background:linear-gradient(135deg,#f48fb1,#e91e8c); color:white; transform:translateY(-2px); box-shadow:0 6px 18px rgba(233,30,140,0.3); }
+        .top-tab-btn.uni { background:linear-gradient(135deg,#b3e5fc,#81d4fa); color:#01579b; }
+        .top-tab-btn.uni:hover,.top-tab-btn.uni.active { background:linear-gradient(135deg,#81d4fa,#039be5); color:white; transform:translateY(-2px); box-shadow:0 6px 18px rgba(3,155,229,0.3); }
+        .top-tab-btn.admin { background:linear-gradient(135deg,#c8e6c9,#a5d6a7); color:#1b5e20; }
+        .top-tab-btn.admin:hover,.top-tab-btn.admin.active { background:linear-gradient(135deg,#a5d6a7,#43a047); color:white; transform:translateY(-2px); box-shadow:0 6px 18px rgba(67,160,71,0.3); }
+
+        .main-card { background:rgba(255,255,255,0.88); backdrop-filter:blur(10px); border-radius:24px; padding:28px; box-shadow:0 8px 32px rgba(0,0,0,0.1); display:none; }
+        .main-card.active { display:block; }
+
+        .sub-tabs { display:flex; gap:8px; margin-bottom:24px; border-bottom:2px solid #f0e6ff; padding-bottom:12px; }
+        .sub-tab-btn { padding:8px 22px; border:none; border-radius:20px; font-size:0.95rem; font-weight:600; cursor:pointer; background:#f3e5f5; color:#7b5ea7; transition:all 0.3s; }
+        .sub-tab-btn:hover,.sub-tab-btn.active { background:linear-gradient(135deg,#ce93d8,#ab47bc); color:white; box-shadow:0 3px 10px rgba(171,71,188,0.3); }
+        .sub-content { display:none; }
+        .sub-content.active { display:block; }
+
+        .date-section { display:flex; align-items:center; gap:12px; margin-bottom:8px; flex-wrap:wrap; }
+        .date-section label { font-weight:600; color:#7b5ea7; font-size:0.95rem; }
+        .date-input { padding:8px 14px; border:2px solid #e1bee7; border-radius:12px; font-size:0.95rem; color:#4a4a4a; background:#fdf6ff; outline:none; transition:border-color 0.3s; }
+        .date-input:focus { border-color:#ab47bc; }
+        .date-hint { font-size:0.78rem; color:#ab47bc; margin-bottom:16px; }
+
+        .expense-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; margin-bottom:20px; }
+        .expense-item { background:linear-gradient(135deg,#fce4ec,#f8bbd0); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:8px; }
+        .expense-item label { font-weight:600; color:#880e4f; font-size:0.9rem; }
+        .expense-item input { padding:8px 12px; border:2px solid #f48fb1; border-radius:10px; font-size:0.95rem; background:white; outline:none; transition:border-color 0.3s; width:100%; }
+        .expense-item input:focus { border-color:#e91e8c; }
+
+        .health-tabs-row { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+        .health-tab-btn { padding:7px 18px; border:none; border-radius:18px; font-size:0.88rem; font-weight:600; cursor:pointer; transition:all 0.25s; }
+        .exercise-tab-btn { background:#e8f5e9; color:#2e7d32; border:2px solid #a5d6a7; }
+        .exercise-tab-btn:hover,.exercise-tab-btn.active { background:linear-gradient(135deg,#66bb6a,#43a047); color:white; border-color:transparent; }
+        .diet-tab-btn { background:#fff8e1; color:#e65100; border:2px solid #ffcc80; }
+        .diet-tab-btn:hover,.diet-tab-btn.active { background:linear-gradient(135deg,#ffa726,#fb8c00); color:white; border-color:transparent; }
+        .health-panel { display:none; }
+        .health-panel.active { display:block; }
+        .health-section-title { font-size:1rem; font-weight:700; margin-bottom:14px; }
+        .exercise-card { background:linear-gradient(135deg,#e8f5e9,#f1f8e9); border-radius:16px; padding:18px; margin-bottom:14px; }
+        .exercise-card .health-section-title { color:#1b5e20; }
+        .exercise-input-wrap { display:flex; flex-direction:column; gap:10px; }
+        .exercise-input-wrap textarea { width:100%; padding:10px; border:2px solid #a5d6a7; border-radius:10px; font-size:0.9rem; resize:vertical; min-height:80px; background:white; outline:none; font-family:inherit; }
+        .time-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        .time-row label { font-size:0.85rem; font-weight:600; color:#388e3c; white-space:nowrap; }
+        .time-sep { font-size:0.85rem; color:#666; font-weight:600; }
+        .time-input { padding:7px 10px; border:2px solid #a5d6a7; border-radius:10px; font-size:0.9rem; background:white; outline:none; width:130px; }
+        .diet-card { background:linear-gradient(135deg,#fff8e1,#fff3e0); border-radius:16px; padding:18px; margin-bottom:14px; }
+        .diet-card .health-section-title { color:#e65100; }
+        .diet-card textarea { width:100%; padding:10px; border:2px solid #ffcc80; border-radius:10px; font-size:0.9rem; resize:vertical; min-height:90px; background:white; outline:none; font-family:inherit; }
+
+        .save-btn { display:block; width:100%; padding:14px; border:none; border-radius:16px; font-size:1.05rem; font-weight:700; cursor:pointer; transition:all 0.3s; letter-spacing:1px; margin-top:4px; }
+        .save-btn.seutha-btn { background:linear-gradient(135deg,#f48fb1,#e91e8c); color:white; box-shadow:0 4px 15px rgba(233,30,140,0.3); }
+        .save-btn.seutha-btn:hover { transform:translateY(-2px); }
+        .save-btn.uni-btn { background:linear-gradient(135deg,#81d4fa,#039be5); color:white; box-shadow:0 4px 15px rgba(3,155,229,0.3); }
+        .save-btn.uni-btn:hover { transform:translateY(-2px); }
+        .save-btn:disabled { opacity:0.6; cursor:not-allowed; transform:none !important; }
+
+        .records-section { margin-top:24px; }
+        .records-section h3 { font-size:1rem; font-weight:700; color:#7b5ea7; margin-bottom:12px; padding-bottom:8px; border-bottom:2px dashed #e1bee7; }
+        .record-item { background:linear-gradient(135deg,#f3e5f5,#ede7f6); border-radius:12px; padding:12px 16px; margin-bottom:10px; font-size:0.88rem; color:#4a4a4a; position:relative; padding-right:70px; transition:all 0.3s; }
+        .record-item.future-record { background:linear-gradient(135deg,#e8f5e9,#f1f8e9); border-left:3px solid #43a047; }
+        /* 낙관적 업데이트 - 저장 중 스타일 */
+        .record-item.saving { opacity:0.6; }
+        .record-item.saving::after { content:'저장 중...'; position:absolute; top:10px; right:10px; font-size:0.75rem; color:#fb8c00; font-weight:600; }
+        .record-item .record-date { font-weight:700; color:#7b5ea7; margin-bottom:6px; font-size:0.92rem; }
+        .record-item.future-record .record-date { color:#2e7d32; }
+        .future-badge { display:inline-block; background:#43a047; color:white; font-size:0.7rem; padding:1px 6px; border-radius:8px; margin-left:6px; }
+        .record-detail { display:flex; flex-wrap:wrap; gap:6px; }
+        .record-tag { background:white; border-radius:8px; padding:3px 8px; font-size:0.82rem; color:#555; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+        .delete-btn { position:absolute; top:10px; right:10px; background:#ffcdd2; border:none; border-radius:8px; padding:3px 8px; font-size:0.78rem; color:#c62828; cursor:pointer; transition:background 0.2s; }
+        .delete-btn:hover { background:#ef9a9a; }
+
+        /* 저장 모달 */
+        .save-modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.2); display:flex; align-items:center; justify-content:center; z-index:9998; opacity:0; transition:opacity 0.25s; pointer-events:none; }
+        .save-modal-overlay.show { opacity:1; pointer-events:all; }
+        .save-modal { background:white; border-radius:24px; padding:32px 44px; text-align:center; box-shadow:0 12px 40px rgba(0,0,0,0.2); transform:scale(0.85); transition:transform 0.25s; }
+        .save-modal-overlay.show .save-modal { transform:scale(1); }
+        .save-modal .modal-icon { font-size:2.8rem; margin-bottom:10px; }
+        .save-modal .modal-title { font-size:1.2rem; font-weight:700; color:#7b5ea7; margin-bottom:4px; }
+        .save-modal .modal-sub { font-size:0.88rem; color:#aaa; }
+
+        .toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%) translateY(100px); background:#7b5ea7; color:white; padding:11px 26px; border-radius:30px; font-size:0.92rem; font-weight:600; box-shadow:0 4px 20px rgba(0,0,0,0.2); transition:transform 0.35s; z-index:9999; white-space:nowrap; }
+        .toast.show { transform:translateX(-50%) translateY(0); }
+
+        /* 관리자 */
+        .admin-section { margin-bottom:28px; }
+        .admin-section h2 { font-size:1.2rem; font-weight:700; color:#2e7d32; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #c8e6c9; }
+        .admin-top-bar { display:flex; justify-content:flex-end; margin-bottom:16px; }
+
+        /* 기간 필터 */
+        .filter-card { background:linear-gradient(135deg,#f3e5f5,#ede7f6); border-radius:16px; padding:16px 20px; margin-bottom:16px; }
+        .filter-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+        .filter-row:last-child { margin-bottom:0; }
+        .filter-row label { font-weight:700; color:#7b5ea7; font-size:0.88rem; min-width:55px; }
+        .period-btn-group { display:flex; gap:6px; flex-wrap:wrap; }
+        .period-btn { padding:6px 16px; border:2px solid #ce93d8; border-radius:20px; background:white; color:#7b5ea7; font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
+        .period-btn:hover,.period-btn.active { background:linear-gradient(135deg,#ce93d8,#ab47bc); color:white; border-color:transparent; box-shadow:0 2px 8px rgba(171,71,188,0.3); }
+        .filter-input { padding:7px 12px; border:2px solid #ce93d8; border-radius:10px; font-size:0.88rem; background:white; outline:none; color:#4a4a4a; }
+        .filter-input:focus { border-color:#ab47bc; }
+        .filter-apply-btn { padding:7px 18px; border:none; border-radius:10px; background:linear-gradient(135deg,#ce93d8,#ab47bc); color:white; font-size:0.88rem; font-weight:700; cursor:pointer; transition:all 0.2s; }
+        .filter-apply-btn:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(171,71,188,0.3); }
+        .active-filter-badge { display:inline-flex; align-items:center; gap:6px; background:#7b5ea7; color:white; border-radius:20px; padding:5px 14px; font-size:0.82rem; font-weight:600; margin-bottom:14px; }
+
+        .reset-btn { padding:8px 18px; border:none; border-radius:12px; background:linear-gradient(135deg,#ffcdd2,#ef9a9a); color:#b71c1c; font-size:0.88rem; font-weight:700; cursor:pointer; transition:all 0.2s; }
+        .reset-btn:hover { background:linear-gradient(135deg,#ef9a9a,#e53935); color:white; transform:translateY(-1px); }
+
+        .total-summary { background:linear-gradient(135deg,#e8f5e9,#f1f8e9); border-radius:14px; padding:16px; margin-bottom:16px; display:flex; justify-content:space-around; flex-wrap:wrap; gap:10px; }
+        .ts-item { text-align:center; }
+        .ts-label { font-size:0.82rem; color:#666; }
+        .ts-value { font-size:1.3rem; font-weight:700; color:#2e7d32; }
+
+        .chart-wrapper { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+        @media(max-width:600px){.chart-wrapper{grid-template-columns:1fr;}}
+        .chart-container { background:white; border-radius:16px; padding:20px; box-shadow:0 3px 12px rgba(0,0,0,0.08); margin-bottom:20px; }
+        .chart-container h3 { font-size:1rem; font-weight:700; color:#555; margin-bottom:6px; text-align:center; }
+        .chart-note { font-size:0.78rem; color:#999; text-align:center; margin-bottom:12px; }
+
+        .admin-records-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        @media(max-width:600px){.admin-records-grid{grid-template-columns:1fr;}}
+        .admin-person-card { background:white; border-radius:16px; padding:16px; box-shadow:0 3px 12px rgba(0,0,0,0.08); }
+        .admin-person-card h3 { font-size:1rem; font-weight:700; margin-bottom:12px; padding-bottom:8px; border-bottom:2px dashed; }
+        .admin-person-card.seutha h3 { color:#e91e8c; border-color:#f48fb1; }
+        .admin-person-card.uni h3 { color:#039be5; border-color:#81d4fa; }
+        .admin-record-item { font-size:0.85rem; padding:8px 10px; border-radius:10px; margin-bottom:8px; background:#f9f9f9; position:relative; padding-right:60px; }
+        .admin-record-item.future-item { background:#f1f8e9; border-left:3px solid #43a047; }
+        .ar-date { font-weight:700; color:#555; margin-bottom:4px; }
+        .ar-tags { display:flex; flex-wrap:wrap; gap:4px; }
+        .ar-tag { background:#ede7f6; border-radius:6px; padding:2px 7px; font-size:0.78rem; color:#7b5ea7; }
+        .ar-delete-btn { position:absolute; top:8px; right:8px; background:#ffcdd2; border:none; border-radius:7px; padding:2px 7px; font-size:0.75rem; color:#c62828; cursor:pointer; }
+        .ar-delete-btn:hover { background:#ef9a9a; }
+
+        .section-divider { height:2px; background:linear-gradient(90deg,transparent,#e1bee7,transparent); margin:24px 0; }
+        .loading { text-align:center; color:#aaa; padding:20px; font-size:0.9rem; }
+        .empty-msg { text-align:center; color:#bbb; padding:16px; font-size:0.88rem; }
+
+        @media(max-width:600px){
+            .expense-grid{grid-template-columns:1fr 1fr;}
+            .time-input{width:120px;}
+        }
+    </style>
+<!-- PWA 설정 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e91e8c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="슷하&우니">
+<link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+<canvas id="particle-canvas"></canvas>
+
+<!-- 연결 상태 -->
+<div id="connection-status">
+    <div class="conn-dot syncing" id="conn-dot"></div>
+    <span id="conn-text">연결 중...</span>
+</div>
+
+<!-- 저장 모달 -->
+<div class="save-modal-overlay" id="save-modal-overlay">
+    <div class="save-modal">
+        <div class="modal-icon">✅</div>
+        <div class="modal-title">저장 완료!</div>
+        <div class="modal-sub" id="modal-sub-text">기록이 저장되었어요 💕</div>
+    </div>
+</div>
+
+<div class="app-container">
+    <div class="app-title">💕 <span>슷하</span> & <span style="color:#039be5">우니</span> 생활 기록 💕</div>
+
+    <div class="top-tabs">
+        <button class="top-tab-btn seutha active" onclick="switchTopTab('seutha',this)">🌸 슷하</button>
+        <button class="top-tab-btn uni" onclick="switchTopTab('uni',this)">🌊 우니</button>
+        <button class="top-tab-btn admin" onclick="switchTopTab('admin',this)">📊 관리자 대시보드</button>
+    </div>
+
+    <!-- 슷하 -->
+    <div id="card-seutha" class="main-card active">
+        <div class="sub-tabs">
+            <button class="sub-tab-btn active" onclick="switchSubTab('seutha','expense',this)">💰 지출금</button>
+            <button class="sub-tab-btn" onclick="switchSubTab('seutha','health',this)">🏃 운동 & 식단</button>
+        </div>
+        <div id="seutha-expense" class="sub-content active">
+            <div class="date-section"><label>📅 날짜</label><input type="date" id="seutha-expense-date" class="date-input"></div>
+            <div class="date-hint">📌 미래 날짜도 미리 입력할 수 있어요!</div>
+            <div class="expense-grid">
+                <div class="expense-item"><label>🍚 식비</label><input type="number" id="seutha-food" placeholder="0" min="0"></div>
+                <div class="expense-item"><label>🧴 생필품</label><input type="number" id="seutha-daily" placeholder="0" min="0"></div>
+                <div class="expense-item"><label>🚌 교통비</label><input type="number" id="seutha-transport" placeholder="0" min="0"></div>
+                <div class="expense-item"><label>🎬 문화비</label><input type="number" id="seutha-culture" placeholder="0" min="0"></div>
+                <div class="expense-item"><label>👗 의류비</label><input type="number" id="seutha-clothes" placeholder="0" min="0"></div>
+                <div class="expense-item"><label>⛪ 헌금</label><input type="number" id="seutha-offering" placeholder="0" min="0"></div>
+                <div class="expense-item"><label>📈 주식</label><input type="number" id="seutha-stock" placeholder="0" min="0"></div>
+                <div class="expense-item"><label>🏦 저축</label><input type="number" id="seutha-saving" placeholder="0" min="0"></div>
+            </div>
+            <button class="save-btn seutha-btn" id="seutha-expense-save-btn" onclick="saveExpense('seutha')">💾 저장하기</button>
+            <div class="records-section">
+                <h3>📋 최근 지출 기록 <span style="font-size:0.75rem;color:#aaa;font-weight:400">(미래 예정 포함)</span></h3>
+                <div id="seutha-expense-records"><div class="loading">불러오는 중...</div></div>
+            </div>
+        </div>
+        <div id="seutha-health" class="sub-content">
+            <div class="date-section"><label>📅 날짜</label><input type="date" id="seutha-health-date" class="date-input"></div>
+            <div class="date-hint">📌 미래 날짜도 미리 입력할 수 있어요!</div>
+            <div class="health-tabs-row">
+                <button class="health-tab-btn exercise-tab-btn active" onclick="switchHealthPanel('seutha','exercise-panel',this)">🏋️ 운동</button>
+                <button class="health-tab-btn diet-tab-btn" onclick="switchHealthPanel('seutha','diet-panel',this)">🥗 식단</button>
+            </div>
+            <div id="seutha-exercise-panel" class="health-panel active">
+                <div class="exercise-card">
+                    <div class="health-section-title">💪 무산소 운동</div>
+                    <div class="exercise-input-wrap">
+                        <textarea id="seutha-anaerobic" placeholder="무산소 운동 내용..."></textarea>
+                        <div class="time-row"><label>⏱ 시작</label><input type="time" id="seutha-anaerobic-start" class="time-input"><span class="time-sep">→ 종료</span><input type="time" id="seutha-anaerobic-end" class="time-input"></div>
+                    </div>
+                </div>
+                <div class="exercise-card">
+                    <div class="health-section-title">🏃 유산소 운동</div>
+                    <div class="exercise-input-wrap">
+                        <textarea id="seutha-aerobic" placeholder="유산소 운동 내용..."></textarea>
+                        <div class="time-row"><label>⏱ 시작</label><input type="time" id="seutha-aerobic-start" class="time-input"><span class="time-sep">→ 종료</span><input type="time" id="seutha-aerobic-end" class="time-input"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="seutha-diet-panel" class="health-panel">
+                <div class="diet-card"><div class="health-section-title">🌅 아침</div><textarea id="seutha-breakfast" placeholder="아침 식단..."></textarea></div>
+                <div class="diet-card"><div class="health-section-title">☀️ 점심</div><textarea id="seutha-lunch" placeholder="점심 식단..."></textarea></div>
+                <div class="diet-card"><div class="health-section-title">🌙 저녁</div><textarea id="seutha-dinner" placeholder="저녁 식단..."></textarea></div>
+            </div>
+            <button class="save-btn seutha-btn" id="seutha-health-save-btn" onclick="saveHealth('seutha')">💾 저장하기</button>
+            <div class="records-section">
+                <h3>📋 최근 운동/식단 기록</h3>
+                <div id="seutha-health-records"><div class="loading">불러오는 중...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 우니 -->
+    <div id="card-uni" class="main-card">
+        <div class="sub-tabs">
+            <button class="sub-tab-btn active" onclick="switchSubTab('uni','expense',this)">💰 지출금</button>
+            <button class="sub-tab-btn" onclick="switchSubTab('uni','health',this)">🏃 운동 & 식단</button>
+        </div>
+        <div id="uni-expense" class="sub-content active">
+            <div class="date-section"><label>📅 날짜</label><input type="date" id="uni-expense-date" class="date-input"></div>
+            <div class="date-hint">📌 미래 날짜도 미리 입력할 수 있어요!</div>
+            <div class="expense-grid">
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🍚 식비</label><input type="number" id="uni-food" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🧴 생필품</label><input type="number" id="uni-daily" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🚌 교통비</label><input type="number" id="uni-transport" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🎬 문화비</label><input type="number" id="uni-culture" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">👗 의류비</label><input type="number" id="uni-clothes" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">⛪ 헌금</label><input type="number" id="uni-offering" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">📈 주식</label><input type="number" id="uni-stock" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🏦 저축</label><input type="number" id="uni-saving" placeholder="0" min="0" style="border-color:#90caf9"></div>
+            </div>
+            <button class="save-btn uni-btn" id="uni-expense-save-btn" onclick="saveExpense('uni')">💾 저장하기</button>
+            <div class="records-section">
+                <h3>📋 최근 지출 기록 <span style="font-size:0.75rem;color:#aaa;font-weight:400">(미래 예정 포함)</span></h3>
+                <div id="uni-expense-records"><div class="loading">불러오는 중...</div></div>
+            </div>
+        </div>
+        <div id="uni-health" class="sub-content">
+            <div class="date-section"><label>📅 날짜</label><input type="date" id="uni-health-date" class="date-input"></div>
+            <div class="date-hint">📌 미래 날짜도 미리 입력할 수 있어요!</div>
+            <div class="health-tabs-row">
+                <button class="health-tab-btn exercise-tab-btn active" onclick="switchHealthPanel('uni','exercise-panel',this)">🏋️ 운동</button>
+                <button class="health-tab-btn diet-tab-btn" onclick="switchHealthPanel('uni','diet-panel',this)">🥗 식단</button>
+            </div>
+            <div id="uni-exercise-panel" class="health-panel active">
+                <div class="exercise-card">
+                    <div class="health-section-title">💪 무산소 운동</div>
+                    <div class="exercise-input-wrap">
+                        <textarea id="uni-anaerobic" placeholder="무산소 운동 내용..."></textarea>
+                        <div class="time-row"><label>⏱ 시작</label><input type="time" id="uni-anaerobic-start" class="time-input"><span class="time-sep">→ 종료</span><input type="time" id="uni-anaerobic-end" class="time-input"></div>
+                    </div>
+                </div>
+                <div class="exercise-card">
+                    <div class="health-section-title">🏃 유산소 운동</div>
+                    <div class="exercise-input-wrap">
+                        <textarea id="uni-aerobic" placeholder="유산소 운동 내용..."></textarea>
+                        <div class="time-row"><label>⏱ 시작</label><input type="time" id="uni-aerobic-start" class="time-input"><span class="time-sep">→ 종료</span><input type="time" id="uni-aerobic-end" class="time-input"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="uni-diet-panel" class="health-panel">
+                <div class="diet-card"><div class="health-section-title">🌅 아침</div><textarea id="uni-breakfast" placeholder="아침 식단..."></textarea></div>
+                <div class="diet-card"><div class="health-section-title">☀️ 점심</div><textarea id="uni-lunch" placeholder="점심 식단..."></textarea></div>
+                <div class="diet-card"><div class="health-section-title">🌙 저녁</div><textarea id="uni-dinner" placeholder="저녁 식단..."></textarea></div>
+            </div>
+            <button class="save-btn uni-btn" id="uni-health-save-btn" onclick="saveHealth('uni')">💾 저장하기</button>
+            <div class="records-section">
+                <h3>📋 최근 운동/식단 기록</h3>
+                <div id="uni-health-records"><div class="loading">불러오는 중...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 관리자 -->
+    <div id="card-admin" class="main-card">
+        <div class="admin-section">
+            <h2>📊 지출 통계</h2>
+            <div class="filter-card">
+                <div class="filter-row">
+                    <label>📅 기간</label>
+                    <div class="period-btn-group">
+                        <button class="period-btn active" onclick="setPeriodMode('daily',this)">일별</button>
+                        <button class="period-btn" onclick="setPeriodMode('weekly',this)">주별</button>
+                        <button class="period-btn" onclick="setPeriodMode('monthly',this)">월별</button>
+                        <button class="period-btn" onclick="setPeriodMode('range',this)">직접 설정</button>
+                        <button class="period-btn" onclick="setPeriodMode('all',this)">전체</button>
+                    </div>
+                </div>
+                <div class="filter-row" id="filter-daily">
+                    <label>날짜</label>
+                    <input type="date" id="filter-date" class="filter-input">
+                    <button class="filter-apply-btn" onclick="applyFilter()">적용</button>
+                </div>
+                <div class="filter-row" id="filter-weekly" style="display:none">
+                    <label>주 선택</label>
+                    <input type="week" id="filter-week" class="filter-input">
+                    <button class="filter-apply-btn" onclick="applyFilter()">적용</button>
+                </div>
+                <div class="filter-row" id="filter-monthly" style="display:none">
+                    <label>월 선택</label>
+                    <input type="month" id="filter-month" class="filter-input">
+                    <button class="filter-apply-btn" onclick="applyFilter()">적용</button>
+                </div>
+                <div class="filter-row" id="filter-range" style="display:none">
+                    <label>시작</label>
+                    <input type="date" id="filter-start" class="filter-input">
+                    <label>종료</label>
+                    <input type="date" id="filter-end" class="filter-input">
+                    <button class="filter-apply-btn" onclick="applyFilter()">적용</button>
+                </div>
+            </div>
+            <div id="active-filter-badge" class="active-filter-badge" style="display:none">
+                🔍 <span id="active-filter-text"></span>
+            </div>
+            <div class="admin-top-bar">
+                <button class="reset-btn" onclick="resetAllData()">🗑 전체 초기화</button>
+            </div>
+            <div class="total-summary">
+                <div class="ts-item"><div class="ts-label">🌸 슷하 총 지출</div><div class="ts-value" id="seutha-total-val">-</div></div>
+                <div class="ts-item"><div class="ts-label">🌊 우니 총 지출</div><div class="ts-value" id="uni-total-val">-</div></div>
+                <div class="ts-item"><div class="ts-label">💑 합산 총 지출</div><div class="ts-value" id="combined-total-val">-</div></div>
+            </div>
+            <div class="chart-wrapper">
+                <div class="chart-container"><h3>🌸 슷하 카테고리별 지출</h3><canvas id="seutha-chart" height="220"></canvas></div>
+                <div class="chart-container"><h3>🌊 우니 카테고리별 지출</h3><canvas id="uni-chart" height="220"></canvas></div>
+            </div>
+            <div class="chart-container">
+                <h3>📅 두 사람 월별 지출 비교</h3>
+                <p class="chart-note">※ 주식·저축 제외 실소비 기준 (미래 예정 포함)</p>
+                <canvas id="compare-chart" height="160"></canvas>
+            </div>
+        </div>
+        <div class="section-divider"></div>
+        <div class="admin-section">
+            <h2>📋 전체 지출 기록</h2>
+            <div class="admin-records-grid">
+                <div class="admin-person-card seutha"><h3>🌸 슷하 지출 기록</h3><div id="admin-seutha-expense-list"><div class="loading">불러오는 중...</div></div></div>
+                <div class="admin-person-card uni"><h3>🌊 우니 지출 기록</h3><div id="admin-uni-expense-list"><div class="loading">불러오는 중...</div></div></div>
+            </div>
+        </div>
+        <div class="section-divider"></div>
+        <div class="admin-section">
+            <h2>🏃 운동 & 식단 기록</h2>
+            <div class="admin-records-grid">
+                <div class="admin-person-card seutha"><h3>🌸 슷하 운동/식단</h3><div id="admin-seutha-health-list"><div class="loading">불러오는 중...</div></div></div>
+                <div class="admin-person-card uni"><h3>🌊 우니 운동/식단</h3><div id="admin-uni-health-list"><div class="loading">불러오는 중...</div></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =============================================
+// Firebase 초기화
+// =============================================
+const firebaseConfig = {
+    apiKey:            "AIzaSyA06eiMxD71KNHdt4fURLEW3AQG9YdkRW4",
+    authDomain:        "starwooni.firebaseapp.com",
+    databaseURL:       "https://starwooni-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "starwooni",
+    storageBucket:     "starwooni.firebasestorage.app",
+    messagingSenderId: "1075231309825",
+    appId:             "1:1075231309825:web:7cdf2121c18b0972d14000"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// =============================================
+// ✅ 로컬 캐시 (속도 핵심!)
+// =============================================
+let localCache = {}; // key → record 전체 데이터 메모리 저장
+
+// =============================================
+// 연결 상태
+// =============================================
+db.ref('.info/connected').on('value', snap => {
+    const dot  = document.getElementById('conn-dot');
+    const text = document.getElementById('conn-text');
+    if (snap.val()) {
+        dot.className = 'conn-dot online';
+        text.textContent = '실시간 연결됨';
+        text.style.color = '#2e7d32';
+    } else {
+        dot.className = 'conn-dot offline';
+        text.textContent = '연결 끊김';
+        text.style.color = '#c62828';
+    }
+});
+
+// =============================================
+// 상수
+// =============================================
+const EXPENSE_CATEGORIES = [
+    { key:'food',      label:'🍚 식비',   color:'#f48fb1' },
+    { key:'daily',     label:'🧴 생필품', color:'#ce93d8' },
+    { key:'transport', label:'🚌 교통비', color:'#90caf9' },
+    { key:'culture',   label:'🎬 문화비', color:'#80cbc4' },
+    { key:'clothes',   label:'👗 의류비', color:'#ffcc80' },
+    { key:'offering',  label:'⛪ 헌금',   color:'#a5d6a7' },
+    { key:'stock',     label:'📈 주식',   color:'#ef9a9a' },
+    { key:'saving',    label:'🏦 저축',   color:'#b0bec5' },
+];
+const EXCLUDE_FROM_COMPARE = ['stock','saving'];
+const COMPARE_MONTHS = ['2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
+const STEP=300000, Y_MAX=3000000;
+
+// =============================================
+// 유틸
+// =============================================
+function getTodayStr() { return new Date().toISOString().split('T')[0]; }
+function getThisMonthStr() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function formatWon(n) { if(!n||n===0) return '0원'; return Number(n).toLocaleString('ko-KR')+'원'; }
+function genKey() { return Date.now().toString(36)+Math.random().toString(36).substr(2,6); }
+function isFuture(d) { return d > getTodayStr(); }
+
+// =============================================
+// 기간 필터
+// =============================================
+let currentPeriodMode = 'daily';
+let currentFilter = { startDate: getTodayStr(), endDate: getTodayStr(), label: `📅 ${getTodayStr()}` };
+
+function setPeriodMode(mode, btn) {
+    currentPeriodMode = mode;
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ['daily','weekly','monthly','range'].forEach(m => {
+        const el = document.getElementById(`filter-${m}`);
+        if(el) el.style.display = (m===mode && mode!=='all') ? 'flex' : 'none';
+    });
+    if(mode==='all') applyFilter();
+}
+
+function applyFilter() {
+    const today = getTodayStr();
+    const mode  = currentPeriodMode;
+    if(mode==='daily') {
+        const d = document.getElementById('filter-date').value || today;
+        currentFilter = { startDate:d, endDate:d, label:`📅 ${d}` };
+    } else if(mode==='weekly') {
+        const w = document.getElementById('filter-week').value;
+        if(!w){ showToast('주를 선택해주세요!'); return; }
+        const [year,week] = w.split('-W').map(Number);
+        const jan4 = new Date(year,0,4);
+        const s = new Date(jan4);
+        s.setDate(jan4.getDate()-((jan4.getDay()+6)%7)+(week-1)*7);
+        const e = new Date(s); e.setDate(s.getDate()+6);
+        const sd=s.toISOString().split('T')[0], ed=e.toISOString().split('T')[0];
+        currentFilter = { startDate:sd, endDate:ed, label:`📅 ${sd} ~ ${ed}` };
+    } else if(mode==='monthly') {
+        const m = document.getElementById('filter-month').value || getThisMonthStr();
+        const [y,mo] = m.split('-').map(Number);
+        const last = new Date(y,mo,0).getDate();
+        currentFilter = { startDate:`${m}-01`, endDate:`${m}-${String(last).padStart(2,'0')}`, label:`📅 ${y}년 ${mo}월` };
+    } else if(mode==='range') {
+        const s=document.getElementById('filter-start').value, e=document.getElementById('filter-end').value;
+        if(!s||!e){ showToast('시작일과 종료일을 선택해주세요!'); return; }
+        if(s>e){ showToast('시작일이 종료일보다 늦을 수 없어요!'); return; }
+        currentFilter = { startDate:s, endDate:e, label:`📅 ${s} ~ ${e}` };
+    } else {
+        currentFilter = { startDate:null, endDate:null, label:'📅 전체 기간' };
+    }
+    const badge = document.getElementById('active-filter-badge');
+    document.getElementById('active-filter-text').textContent = currentFilter.label;
+    badge.style.display = 'inline-flex';
+    // 캐시 기반으로 즉시 렌더링
+    renderAdminFromCache();
+}
+
+// =============================================
+// 초기화
+// =============================================
+window.onload = function() {
+    const today = getTodayStr();
+    ['seutha','uni'].forEach(p => {
+        document.getElementById(`${p}-expense-date`).value = today;
+        document.getElementById(`${p}-health-date`).value  = today;
+    });
+    document.getElementById('filter-date').value  = today;
+    document.getElementById('filter-month').value = getThisMonthStr();
+
+    // ✅ 단일 리스너로 전체 데이터 실시간 수신 → 캐시 업데이트
+    db.ref('records').on('value', snapshot => {
+        localCache = {};
+        snapshot.forEach(child => { localCache[child.key] = { id:child.key, ...child.val() }; });
+        // 모든 뷰 즉시 갱신
+        renderPersonRecords('seutha','expense');
+        renderPersonRecords('seutha','health');
+        renderPersonRecords('uni','expense');
+        renderPersonRecords('uni','health');
+        // 관리자 탭이 열려있으면 갱신
+        if(document.getElementById('card-admin').classList.contains('active')) {
+            renderAdminFromCache();
+        }
+    });
+
+    initParticles();
+};
+
+// =============================================
+// 탭 전환
+// =============================================
+function switchTopTab(tab,btn) {
+    ['seutha','uni','admin'].forEach(t=>document.getElementById(`card-${t}`).classList.remove('active'));
+    document.querySelectorAll('.top-tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById(`card-${tab}`).classList.add('active');
+    btn.classList.add('active');
+    if(tab==='admin') { applyFilter(); }
+}
+function switchSubTab(person,tab,btn) {
+    const card=document.getElementById(`card-${person}`);
+    card.querySelectorAll('.sub-content').forEach(c=>c.classList.remove('active'));
+    card.querySelectorAll('.sub-tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById(`${person}-${tab}`).classList.add('active');
+    btn.classList.add('active');
+}
+function switchHealthPanel(person,panel,btn) {
+    const parent=document.getElementById(`${person}-health`);
+    parent.querySelectorAll('.health-panel').forEach(p=>p.classList.remove('active'));
+    parent.querySelectorAll('.health-tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById(`${person}-${panel}`).classList.add('active');
+    btn.classList.add('active');
+}
+
+// =============================================
+// 모달 & 토스트
+// =============================================
+function showSaveModal(sub) {
+    const o=document.getElementById('save-modal-overlay');
+    document.getElementById('modal-sub-text').textContent=sub||'저장되었어요 💕';
+    o.classList.add('show');
+    setTimeout(()=>o.classList.remove('show'),1500);
+}
+function showToast(msg) {
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),2500);
+}
+function setSyncing(on) {
+    const dot=document.getElementById('conn-dot'), text=document.getElementById('conn-text');
+    if(on){ dot.className='conn-dot syncing'; text.textContent='저장 중...'; text.style.color='#e65100'; }
+    else  { dot.className='conn-dot online';  text.textContent='실시간 연결됨'; text.style.color='#2e7d32'; }
+}
+
+// =============================================
+// ✅ 낙관적 업데이트 - 지출 저장
+// =============================================
+async function saveExpense(person) {
+    const date = document.getElementById(`${person}-expense-date`).value;
+    if(!date){ showToast('날짜를 선택해주세요!'); return; }
+
+    const data = { date, person, type:'expense', createdAt:Date.now() };
+    let hasData = false;
+    EXPENSE_CATEGORIES.forEach(cat => {
+        const val = parseInt(document.getElementById(`${person}-${cat.key}`).value)||0;
+        data[cat.key] = val;
+        if(val>0) hasData = true;
+    });
+    if(!hasData){ showToast('금액을 하나 이상 입력해주세요!'); return; }
+
+    const key = genKey();
+    const btn = document.getElementById(`${person}-expense-save-btn`);
+
+    // ✅ 1. 즉시 로컬 캐시에 추가 → UI 바로 반영
+    localCache[key] = { id:key, ...data };
+    renderPersonRecords(person,'expense');
+    if(document.getElementById('card-admin').classList.contains('active')) renderAdminFromCache();
+
+    // ✅ 2. 입력창 즉시 초기화
+    EXPENSE_CATEGORIES.forEach(cat=>{ document.getElementById(`${person}-${cat.key}`).value=''; });
+
+    // ✅ 3. 모달 즉시 표시
+    const fut = isFuture(date);
+    showSaveModal(`${person==='seutha'?'🌸 슷하':'🌊 우니'}의 ${fut?'예정 ':''}지출이 저장되었어요!`);
+
+    // ✅ 4. 백그라운드에서 Firebase 저장
+    btn.disabled = true;
+    setSyncing(true);
+    try {
+        await db.ref(`records/${key}`).set(data);
+    } catch(e) {
+        // 실패 시 캐시에서 제거 후 롤백
+        delete localCache[key];
+        renderPersonRecords(person,'expense');
+        showToast('❌ 저장 실패: '+e.message);
+    } finally {
+        btn.disabled = false;
+        setSyncing(false);
+    }
+}
+
+// =============================================
+// ✅ 낙관적 업데이트 - 운동/식단 저장
+// =============================================
+async function saveHealth(person) {
+    const date = document.getElementById(`${person}-health-date`).value;
+    if(!date){ showToast('날짜를 선택해주세요!'); return; }
+
+    const fields = {
+        anaerobic:      document.getElementById(`${person}-anaerobic`).value.trim(),
+        anaerobicStart: document.getElementById(`${person}-anaerobic-start`).value,
+        anaerobicEnd:   document.getElementById(`${person}-anaerobic-end`).value,
+        aerobic:        document.getElementById(`${person}-aerobic`).value.trim(),
+        aerobicStart:   document.getElementById(`${person}-aerobic-start`).value,
+        aerobicEnd:     document.getElementById(`${person}-aerobic-end`).value,
+        breakfast:      document.getElementById(`${person}-breakfast`).value.trim(),
+        lunch:          document.getElementById(`${person}-lunch`).value.trim(),
+        dinner:         document.getElementById(`${person}-dinner`).value.trim(),
+    };
+    if(!fields.anaerobic&&!fields.aerobic&&!fields.breakfast&&!fields.lunch&&!fields.dinner){
+        showToast('운동 또는 식단을 입력해주세요!'); return;
+    }
+
+    const key  = genKey();
+    const data = { date, person, type:'health', createdAt:Date.now(), ...fields };
+    const btn  = document.getElementById(`${person}-health-save-btn`);
+
+    // ✅ 즉시 캐시 반영
+    localCache[key] = { id:key, ...data };
+    renderPersonRecords(person,'health');
+
+    // ✅ 입력창 즉시 초기화
+    ['anaerobic','aerobic','breakfast','lunch','dinner'].forEach(f=>{ document.getElementById(`${person}-${f}`).value=''; });
+    ['anaerobic-start','anaerobic-end','aerobic-start','aerobic-end'].forEach(f=>{ document.getElementById(`${person}-${f}`).value=''; });
+
+    showSaveModal(`${person==='seutha'?'🌸 슷하':'🌊 우니'}의 운동/식단이 저장되었어요!`);
+
+    btn.disabled = true;
+    setSyncing(true);
+    try {
+        await db.ref(`records/${key}`).set(data);
+    } catch(e) {
+        delete localCache[key];
+        renderPersonRecords(person,'health');
+        showToast('❌ 저장 실패: '+e.message);
+    } finally {
+        btn.disabled = false;
+        setSyncing(false);
+    }
+}
+
+// =============================================
+// ✅ 캐시 기반 렌더링 (즉시!)
+// =============================================
+function getFilteredRecords(person, type) {
+    return Object.values(localCache)
+        .filter(r => r.person===person && r.type===type)
+        .sort((a,b) => b.date.localeCompare(a.date) || b.createdAt-a.createdAt);
+}
+
+function renderPersonRecords(person, type) {
+    const container = document.getElementById(`${person}-${type}-records`);
+    const records   = getFilteredRecords(person, type).slice(0,15);
+    if(records.length===0){ container.innerHTML='<div class="empty-msg">아직 기록이 없어요 😊</div>'; return; }
+    const today = getTodayStr();
+    container.innerHTML = '';
+    records.forEach(d => {
+        const div = document.createElement('div');
+        const fut = d.date > today;
+        div.className = 'record-item'+(fut?' future-record':'');
+        if(type==='expense') {
+            let tags='', total=0;
+            EXPENSE_CATEGORIES.forEach(cat => {
+                if(d[cat.key]>0){ tags+=`<span class="record-tag">${cat.label} ${formatWon(d[cat.key])}</span>`; total+=d[cat.key]; }
+            });
+            div.innerHTML=`
+                <div class="record-date">📅 ${d.date}${fut?'<span class="future-badge">예정</span>':''}
+                    <span style="color:#e91e8c;font-size:0.83rem"> 합계: ${formatWon(total)}</span>
+                </div>
+                <div class="record-detail">${tags}</div>
+                <button class="delete-btn" onclick="deleteRecord('${d.id}')">🗑 삭제</button>`;
+        } else {
+            let tags='';
+            if(d.anaerobic){ const t=(d.anaerobicStart&&d.anaerobicEnd)?` (${d.anaerobicStart}~${d.anaerobicEnd})`:''; tags+=`<span class="record-tag">💪 무산소: ${d.anaerobic}${t}</span>`; }
+            if(d.aerobic)  { const t=(d.aerobicStart&&d.aerobicEnd)?` (${d.aerobicStart}~${d.aerobicEnd})`:''; tags+=`<span class="record-tag">🏃 유산소: ${d.aerobic}${t}</span>`; }
+            if(d.breakfast) tags+=`<span class="record-tag">🌅 아침: ${d.breakfast}</span>`;
+            if(d.lunch)     tags+=`<span class="record-tag">☀️ 점심: ${d.lunch}</span>`;
+            if(d.dinner)    tags+=`<span class="record-tag">🌙 저녁: ${d.dinner}</span>`;
+            div.innerHTML=`
+                <div class="record-date">📅 ${d.date}${fut?'<span class="future-badge">예정</span>':''}</div>
+                <div class="record-detail">${tags||'<span class="record-tag">내용 없음</span>'}</div>
+                <button class="delete-btn" onclick="deleteRecord('${d.id}')">🗑 삭제</button>`;
+        }
+        container.appendChild(div);
+    });
+}
+
+// =============================================
+// 삭제 (낙관적)
+// =============================================
+async function deleteRecord(id) {
+    if(!confirm('이 기록을 삭제할까요?')) return;
+    const backup = localCache[id];
+    delete localCache[id];
+    // 즉시 모든 뷰 갱신
+    if(backup){ renderPersonRecords(backup.person, backup.type); }
+    if(document.getElementById('card-admin').classList.contains('active')) renderAdminFromCache();
+    try {
+        await db.ref(`records/${id}`).remove();
+        showToast('🗑 삭제되었습니다');
+    } catch(e) {
+        if(backup) localCache[id]=backup;
+        if(backup){ renderPersonRecords(backup.person, backup.type); }
+        showToast('❌ 삭제 실패');
+    }
+}
+async function adminDeleteRecord(id) {
+    if(!confirm('이 기록을 삭제할까요?')) return;
+    const backup = localCache[id];
+    delete localCache[id];
+    renderAdminFromCache();
+    if(backup){ renderPersonRecords(backup.person, backup.type); }
+    try {
+        await db.ref(`records/${id}`).remove();
+        showToast('🗑 삭제되었습니다');
+    } catch(e) {
+        if(backup) localCache[id]=backup;
+        renderAdminFromCache();
+        showToast('❌ 삭제 실패');
+    }
+}
+
+// =============================================
+// 전체 초기화
+// =============================================
+async function resetAllData() {
+    if(!confirm('⚠️ 정말로 모든 데이터를 초기화할까요?')) return;
+    if(!confirm('⚠️ 마지막 확인! 모든 기록이 삭제됩니다.')) return;
+    try {
+        localCache = {};
+        ['seutha','uni'].forEach(p=>{ renderPersonRecords(p,'expense'); renderPersonRecords(p,'health'); });
+        renderAdminFromCache();
+        await db.ref('records').remove();
+        showToast('✅ 초기화 완료');
+    } catch(e){ showToast('❌ 초기화 실패: '+e.message); }
+}
+
+// =============================================
+// ✅ 관리자 - 캐시 기반 즉시 렌더링
+// (미래 날짜도 기간 내 포함하여 반영)
+// =============================================
+let seuthaPieChart=null, uniPieChart=null, compareBarChart=null;
+
+function renderAdminFromCache() {
+    const { startDate, endDate } = currentFilter;
+    const all = Object.values(localCache);
+
+    // ✅ 미래 날짜 포함 - 기간 내 모든 날짜 반영
+    const filterByDate = r => {
+        if(!startDate && !endDate) return true;
+        if(startDate && r.date < startDate) return false;
+        if(endDate   && r.date > endDate)   return false;
+        return true;
+    };
+
+    processAdminExpense('seutha', all, filterByDate);
+    processAdminExpense('uni',    all, filterByDate);
+    renderAdminHealth('seutha',   all);
+    renderAdminHealth('uni',      all);
+    drawCompareChart(all);
+}
+
+function processAdminExpense(person, all, filterFn) {
+    let records = all.filter(r => r.person===person && r.type==='expense' && filterFn(r));
+    records.sort((a,b) => b.date.localeCompare(a.date));
+
+    const catTotals = {};
+    EXPENSE_CATEGORIES.forEach(cat => catTotals[cat.key]=0);
+    let grandTotal = 0;
+    records.forEach(r => {
+        EXPENSE_CATEGORIES.forEach(cat => {
+            catTotals[cat.key] += (r[cat.key]||0);
+            grandTotal         += (r[cat.key]||0);
+        });
+    });
+
+    document.getElementById(`${person}-total-val`).textContent = formatWon(grandTotal);
+    updateCombinedTotal();
+    drawPieChart(person, catTotals);
+
+    const listEl = document.getElementById(`admin-${person}-expense-list`);
+    const today  = getTodayStr();
+    if(records.length===0){ listEl.innerHTML='<div class="empty-msg">기록 없음</div>'; return; }
+    listEl.innerHTML='';
+    records.forEach(r => {
+        const fut = r.date > today;
+        let total=0, tags='';
+        EXPENSE_CATEGORIES.forEach(cat => {
+            if(r[cat.key]>0){ tags+=`<span class="ar-tag">${cat.label} ${formatWon(r[cat.key])}</span>`; total+=r[cat.key]; }
+        });
+        const div = document.createElement('div');
+        div.className = 'admin-record-item'+(fut?' future-item':'');
+        div.innerHTML=`
+            <div class="ar-date">📅 ${r.date}${fut?'<span class="future-badge" style="margin-left:5px">예정</span>':''} — 합계: ${formatWon(total)}</div>
+            <div class="ar-tags">${tags}</div>
+            <button class="ar-delete-btn" onclick="adminDeleteRecord('${r.id}')">🗑 삭제</button>`;
+        listEl.appendChild(div);
+    });
+}
+
+function renderAdminHealth(person, all) {
+    let records = all.filter(r => r.person===person && r.type==='health');
+    records.sort((a,b) => b.date.localeCompare(a.date));
+    records = records.slice(0,20);
+    const listEl = document.getElementById(`admin-${person}-health-list`);
+    const today  = getTodayStr();
+    if(records.length===0){ listEl.innerHTML='<div class="empty-msg">기록 없음</div>'; return; }
+    listEl.innerHTML='';
+    records.forEach(d => {
+        const fut = d.date > today;
+        let tags='';
+        if(d.anaerobic){ const t=(d.anaerobicStart&&d.anaerobicEnd)?` (${d.anaerobicStart}~${d.anaerobicEnd})`:''; tags+=`<span class="ar-tag">💪 무산소: ${d.anaerobic}${t}</span>`; }
+        if(d.aerobic)  { const t=(d.aerobicStart&&d.aerobicEnd)?` (${d.aerobicStart}~${d.aerobicEnd})`:''; tags+=`<span class="ar-tag">🏃 유산소: ${d.aerobic}${t}</span>`; }
+        if(d.breakfast) tags+=`<span class="ar-tag">🌅 아침: ${d.breakfast}</span>`;
+        if(d.lunch)     tags+=`<span class="ar-tag">☀️ 점심: ${d.lunch}</span>`;
+        if(d.dinner)    tags+=`<span class="ar-tag">🌙 저녁: ${d.dinner}</span>`;
+        const div = document.createElement('div');
+        div.className = 'admin-record-item'+(fut?' future-item':'');
+        div.innerHTML=`
+            <div class="ar-date">📅 ${d.date}${fut?'<span class="future-badge" style="margin-left:5px">예정</span>':''}</div>
+            <div class="ar-tags">${tags||'<span class="ar-tag">내용 없음</span>'}</div>
+            <button class="ar-delete-btn" onclick="adminDeleteRecord('${d.id}')">🗑 삭제</button>`;
+        listEl.appendChild(div);
+    });
+}
+
+function updateCombinedTotal() {
+    const s=parseInt(document.getElementById('seutha-total-val').textContent.replace(/[^0-9]/g,''))||0;
+    const u=parseInt(document.getElementById('uni-total-val').textContent.replace(/[^0-9]/g,''))||0;
+    document.getElementById('combined-total-val').textContent=formatWon(s+u);
+}
+
+function drawPieChart(person, catTotals) {
+    const ctx=document.getElementById(`${person}-chart`).getContext('2d');
+    if(person==='seutha'&&seuthaPieChart) seuthaPieChart.destroy();
+    if(person==='uni'   &&uniPieChart)    uniPieChart.destroy();
+    const chart=new Chart(ctx,{
+        type:'doughnut',
+        data:{ labels:EXPENSE_CATEGORIES.map(c=>c.label), datasets:[{ data:EXPENSE_CATEGORIES.map(c=>catTotals[c.key]), backgroundColor:EXPENSE_CATEGORIES.map(c=>c.color), borderWidth:2, borderColor:'white' }] },
+        options:{ responsive:true, plugins:{ legend:{position:'bottom',labels:{font:{size:11},padding:8}}, tooltip:{callbacks:{label:c=>` ${c.label}: ${formatWon(c.raw)}`}} } }
+    });
+    if(person==='seutha') seuthaPieChart=chart; else uniPieChart=chart;
+}
+
+function drawCompareChart(all) {
+    const sT=new Array(COMPARE_MONTHS.length).fill(0);
+    const uT=new Array(COMPARE_MONTHS.length).fill(0);
+    // ✅ 미래 예정 지출도 월별 비교에 포함
+    all.filter(r=>r.type==='expense').forEach(d=>{
+        const idx=COMPARE_MONTHS.indexOf(d.date.substring(0,7));
+        if(idx===-1) return;
+        let total=0;
+        EXPENSE_CATEGORIES.forEach(cat=>{ if(!EXCLUDE_FROM_COMPARE.includes(cat.key)) total+=(d[cat.key]||0); });
+        if(d.person==='seutha') sT[idx]+=total;
+        else if(d.person==='uni') uT[idx]+=total;
+    });
+    const ctx=document.getElementById('compare-chart').getContext('2d');
+    if(compareBarChart) compareBarChart.destroy();
+    compareBarChart=new Chart(ctx,{
+        type:'bar',
+        data:{
+            labels:COMPARE_MONTHS.map(m=>`${parseInt(m.split('-')[1])}월`),
+            datasets:[
+                {label:'🌸 슷하',data:sT,backgroundColor:'rgba(244,143,177,0.75)',borderColor:'#e91e8c',borderWidth:2,borderRadius:6},
+                {label:'🌊 우니',data:uT,backgroundColor:'rgba(129,212,250,0.75)',borderColor:'#039be5',borderWidth:2,borderRadius:6}
+            ]
+        },
+        options:{
+            responsive:true,
+            plugins:{legend:{position:'top'},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${formatWon(c.raw)}`}}},
+            scales:{
+                y:{min:0,max:Y_MAX,ticks:{stepSize:STEP,callback:v=>v===0?'0':v>=1000000?(v/1000000)+'백만':(v/10000)+'만원',font:{size:11}},grid:{color:'rgba(0,0,0,0.07)'}},
+                x:{grid:{display:false},ticks:{font:{size:12},maxRotation:0}}
+            }
+        }
+    });
+}
+
+// =============================================
+// 파티클
+// =============================================
+function initParticles() {
+    const canvas=document.getElementById('particle-canvas');
+    const ctx=canvas.getContext('2d');
+    const photoImgs=['photo1.png','photo2.png','photo3.png'].map(s=>{const i=new Image();i.src=s;return i;});
+    function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+    resize(); window.addEventListener('resize',resize);
+    class P {
+        constructor(){this.reset(true);}
+        reset(init=false){
+            this.x=Math.random()*canvas.width; this.y=init?Math.random()*canvas.height:-30;
+            this.size=Math.random()*14+8; this.speedY=Math.random()*1.2+0.4;
+            this.speedX=(Math.random()-0.5)*0.8; this.angle=Math.random()*Math.PI*2;
+            this.spin=(Math.random()-0.5)*0.04; this.opacity=Math.random()*0.5+0.4;
+            this.swing=Math.random()*0.8+0.3; this.swingOff=Math.random()*Math.PI*2;
+            this.type=Math.floor(Math.random()*6);
+            if(this.type>=3) this.imgIdx=Math.floor(Math.random()*photoImgs.length);
+            const pk=['#ffb7c5','#ffc0cb','#ff91a4','#ffaec9','#ffd1dc','#ff85a1'];
+            this.color=pk[Math.floor(Math.random()*pk.length)];
+        }
+        update(t){ this.y+=this.speedY; this.x+=this.speedX+Math.sin(t*0.001*this.swing+this.swingOff)*0.5; this.angle+=this.spin; if(this.y>canvas.height+30) this.reset(); }
+        drawB(c){ c.save();c.translate(this.x,this.y);c.rotate(this.angle);c.globalAlpha=this.opacity; const r=this.size/2; for(let i=0;i<5;i++){c.save();c.rotate(i*Math.PI*2/5);c.beginPath();c.ellipse(0,-r*.7,r*.38,r*.6,0,0,Math.PI*2);c.fillStyle=this.color;c.fill();c.restore();} c.beginPath();c.arc(0,0,r*.22,0,Math.PI*2);c.fillStyle='#ffe4e1';c.fill();c.restore(); }
+        drawP(c){ const img=photoImgs[this.imgIdx]; if(!img||!img.complete||!img.naturalWidth){this.drawB(c);return;} c.save();c.translate(this.x,this.y);c.rotate(this.angle);c.globalAlpha=this.opacity; const s=this.size*1.6; c.beginPath();c.arc(0,0,s/2,0,Math.PI*2);c.clip();c.drawImage(img,-s/2,-s/2,s,s); c.beginPath();c.arc(0,0,s/2,0,Math.PI*2);c.strokeStyle='rgba(255,182,193,0.7)';c.lineWidth=1.5;c.stroke();c.restore(); }
+        draw(c){ this.type<3?this.drawB(c):this.drawP(c); }
+    }
+    const ps=Array.from({length:60},()=>new P());
+    let t=0;
+    (function loop(){ ctx.clearRect(0,0,canvas.width,canvas.height); t++; ps.forEach(p=>{p.update(t);p.draw(ctx);}); requestAnimationFrame(loop); })();
+}
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      // ↓ 경로 수정!
+      navigator.serviceWorker.register('/starwooni/sw.js')
+        .then(() => console.log('✅ PWA 등록 완료'))
+        .catch(e => console.log('❌ 오류:', e));
+    });
+  }
+</script>
+</body>
+</html>
