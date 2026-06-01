@@ -760,9 +760,22 @@ function getFilteredRecords(person, type) {
 
 function renderPersonRecords(person, type) {
     const container = document.getElementById(`${person}-${type}-records`);
-    const records   = getFilteredRecords(person, type).slice(0,15);
-    if(records.length===0){ container.innerHTML='<div class="empty-msg">아직 기록이 없어요 😊</div>'; return; }
     const today = getTodayStr();
+
+    let records = getFilteredRecords(person, type);
+
+    // ✅ 지출 기록은 오늘 날짜만 표시
+    if(type === 'expense') {
+        records = records.filter(r => r.date === today).slice(0, 15);
+    } else {
+        records = records.slice(0, 15);
+    }
+
+    if(records.length === 0){
+        container.innerHTML = '<div class="empty-msg">아직 기록이 없어요 😊</div>';
+        return;
+    }
+
     container.innerHTML = '';
     records.forEach(d => {
         const div = document.createElement('div');
@@ -773,11 +786,16 @@ function renderPersonRecords(person, type) {
             EXPENSE_CATEGORIES.forEach(cat => {
                 if(d[cat.key]>0){ tags+=`<span class="record-tag">${cat.label} ${formatWon(d[cat.key])}</span>`; total+=d[cat.key]; }
             });
+            // ✅ 메모 표시
+            const memoHtml = d.memo
+                ? `<div class="record-memo">📝 ${d.memo}</div>`
+                : '';
             div.innerHTML=`
                 <div class="record-date">📅 ${d.date}${fut?'<span class="future-badge">예정</span>':''}
                     <span style="color:#e91e8c;font-size:0.83rem"> 합계: ${formatWon(total)}</span>
                 </div>
                 <div class="record-detail">${tags}</div>
+                ${memoHtml}
                 <button class="delete-btn" onclick="deleteRecord('${d.id}')">🗑 삭제</button>`;
         } else {
             let tags='';
@@ -794,6 +812,7 @@ function renderPersonRecords(person, type) {
         container.appendChild(div);
     });
 }
+
 
 // =============================================
 // 삭제 (낙관적)
