@@ -260,10 +260,15 @@
                 <div class="expense-item"><label>🚌 교통비</label><input type="number" id="seutha-transport" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>🎬 문화비</label><input type="number" id="seutha-culture" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>👗 의류비</label><input type="number" id="seutha-clothes" placeholder="0" min="0"></div>
+                <div class="expense-item"><label>🎁 경조사비</label><input type="number" id="seutha-event" placeholder="0" min="0"></div> 
                 <div class="expense-item"><label>⛪ 헌금</label><input type="number" id="seutha-offering" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>📈 주식</label><input type="number" id="seutha-stock" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>🏦 저축</label><input type="number" id="seutha-saving" placeholder="0" min="0"></div>
             </div>
+            <textarea id="seutha-expense-memo" placeholder="📝 세부 메모 (선택사항)" 
+              style="width:100%;padding:10px;border-radius:10px;border:1.5px solid #ffb7c5;
+              font-size:0.9rem;resize:none;height:60px;margin-top:8px;
+              font-family:inherit;box-sizing:border-box;"></textarea>
             <button class="save-btn seutha-btn" id="seutha-expense-save-btn" onclick="saveExpense('seutha')">💾 저장하기</button>
             <div class="records-section">
                 <h3>📋 최근 지출 기록 <span style="font-size:0.75rem;color:#aaa;font-weight:400">(미래 예정 포함)</span></h3>
@@ -321,10 +326,15 @@
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🚌 교통비</label><input type="number" id="uni-transport" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🎬 문화비</label><input type="number" id="uni-culture" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">👗 의류비</label><input type="number" id="uni-clothes" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🎁 경조사비</label><input type="number" id="uni-event" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">⛪ 헌금</label><input type="number" id="uni-offering" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">📈 주식</label><input type="number" id="uni-stock" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🏦 저축</label><input type="number" id="uni-saving" placeholder="0" min="0" style="border-color:#90caf9"></div>
             </div>
+            <textarea id="uni-expense-memo" placeholder="📝 세부 메모 (선택사항)"
+                style="width:100%;padding:10px;border-radius:10px;border:1.5px solid #81d4fa;
+                font-size:0.9rem;resize:none;height:60px;margin-top:8px;
+                font-family:inherit;box-sizing:border-box;"></textarea>
             <button class="save-btn uni-btn" id="uni-expense-save-btn" onclick="saveExpense('uni')">💾 저장하기</button>
             <div class="records-section">
                 <h3>📋 최근 지출 기록 <span style="font-size:0.75rem;color:#aaa;font-weight:400">(미래 예정 포함)</span></h3>
@@ -494,6 +504,7 @@ const EXPENSE_CATEGORIES = [
     { key:'transport', label:'🚌 교통비', color:'#90caf9' },
     { key:'culture',   label:'🎬 문화비', color:'#80cbc4' },
     { key:'clothes',   label:'👗 의류비', color:'#ffcc80' },
+    { key:'event',     label:'🎁 경조사비', color:'#ff6e6e' },
     { key:'offering',  label:'⛪ 헌금',   color:'#a5d6a7' },
     { key:'stock',     label:'📈 주식',   color:'#ef9a9a' },
     { key:'saving',    label:'🏦 저축',   color:'#b0bec5' },
@@ -646,7 +657,8 @@ async function saveExpense(person) {
     const date = document.getElementById(`${person}-expense-date`).value;
     if(!date){ showToast('날짜를 선택해주세요!'); return; }
 
-    const data = { date, person, type:'expense', createdAt:Date.now() };
+    const memo = document.getElementById(`${person}-expense-memo`).value.trim();
+    const data = { date, person, type:'expense', createdAt:Date.now(),memo };
     let hasData = false;
     EXPENSE_CATEGORIES.forEach(cat => {
         const val = parseInt(document.getElementById(`${person}-${cat.key}`).value)||0;
@@ -665,6 +677,7 @@ async function saveExpense(person) {
 
     // ✅ 2. 입력창 즉시 초기화
     EXPENSE_CATEGORIES.forEach(cat=>{ document.getElementById(`${person}-${cat.key}`).value=''; });
+    document.getElementById(`${person}-expense-memo`).value = '';
 
     // ✅ 3. 모달 즉시 표시
     const fut = isFuture(date);
