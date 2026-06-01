@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>슷하 & 우니 생활 기록</title>
-<!-- 앱 타이틀 아래에 추가 -->
 <div id="install-banner" style="display:none; text-align:center; margin-bottom:16px;">
   <button id="install-btn" style="
     background:linear-gradient(135deg,#f48fb1,#e91e8c);
@@ -55,7 +54,7 @@
             display:flex; align-items:center; gap:8px;
             background:rgba(255,255,255,0.95); backdrop-filter:blur(8px);
             border-radius:30px; padding:8px 16px;
-            box-shadow:0 4px 16px rgba(0,0,0,0.12);
+            box-shadow:0 4px 166px rgba(0,0,0,0.12);
             z-index:9000; font-size:0.82rem; font-weight:600; transition:all 0.4s ease;
         }
         .conn-dot { width:10px; height:10px; border-radius:50%; transition:background 0.4s; }
@@ -93,11 +92,17 @@
         .date-input:focus { border-color:#ab47bc; }
         .date-hint { font-size:0.78rem; color:#ab47bc; margin-bottom:16px; }
 
-        .expense-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; margin-bottom:20px; }
+        .expense-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; margin-bottom:14px; }
         .expense-item { background:linear-gradient(135deg,#fce4ec,#f8bbd0); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:8px; }
         .expense-item label { font-weight:600; color:#880e4f; font-size:0.9rem; }
         .expense-item input { padding:8px 12px; border:2px solid #f48fb1; border-radius:10px; font-size:0.95rem; background:white; outline:none; transition:border-color 0.3s; width:100%; }
         .expense-item input:focus { border-color:#e91e8c; }
+        
+        /* 지출 메모 스타일 */
+        .expense-memo-wrap { margin-bottom: 20px; }
+        .expense-memo-wrap label { display:block; font-weight:600; color:#7b5ea7; font-size:0.95rem; margin-bottom:8px; }
+        .expense-memo-wrap textarea { width:100%; padding:12px; border:2px solid #e1bee7; border-radius:12px; font-size:0.9rem; resize:vertical; min-height:60px; background:#fdf6ff; outline:none; font-family:inherit; transition:border-color 0.3s; }
+        .expense-memo-wrap textarea:focus { border-color:#ab47bc; }
 
         .health-tabs-row { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
         .health-tab-btn { padding:7px 18px; border:none; border-radius:18px; font-size:0.88rem; font-weight:600; cursor:pointer; transition:all 0.25s; }
@@ -137,8 +142,9 @@
         .record-item .record-date { font-weight:700; color:#7b5ea7; margin-bottom:6px; font-size:0.92rem; }
         .record-item.future-record .record-date { color:#2e7d32; }
         .future-badge { display:inline-block; background:#43a047; color:white; font-size:0.7rem; padding:1px 6px; border-radius:8px; margin-left:6px; }
-        .record-detail { display:flex; flex-wrap:wrap; gap:6px; }
+        .record-detail { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px; }
         .record-tag { background:white; border-radius:8px; padding:3px 8px; font-size:0.82rem; color:#555; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+        .record-memo { background:rgba(255,255,255,0.5); border-left:2px solid #ce93d8; border-radius:4px; padding:4px 8px; font-size:0.82rem; color:#666; width:100%; margin-top:4px; word-break:break-all; }
         .delete-btn { position:absolute; top:10px; right:10px; background:#ffcdd2; border:none; border-radius:8px; padding:3px 8px; font-size:0.78rem; color:#c62828; cursor:pointer; transition:background 0.2s; }
         .delete-btn:hover { background:#ef9a9a; }
 
@@ -196,8 +202,9 @@
         .admin-record-item { font-size:0.85rem; padding:8px 10px; border-radius:10px; margin-bottom:8px; background:#f9f9f9; position:relative; padding-right:60px; }
         .admin-record-item.future-item { background:#f1f8e9; border-left:3px solid #43a047; }
         .ar-date { font-weight:700; color:#555; margin-bottom:4px; }
-        .ar-tags { display:flex; flex-wrap:wrap; gap:4px; }
+        .ar-tags { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px; }
         .ar-tag { background:#ede7f6; border-radius:6px; padding:2px 7px; font-size:0.78rem; color:#7b5ea7; }
+        .ar-memo { background:rgba(0,0,0,0.03); border-left:2px solid #7b5ea7; border-radius:4px; padding:4px 8px; font-size:0.78rem; color:#666; word-break:break-all; margin-top:4px; }
         .ar-delete-btn { position:absolute; top:8px; right:8px; background:#ffcdd2; border:none; border-radius:7px; padding:2px 7px; font-size:0.75rem; color:#c62828; cursor:pointer; }
         .ar-delete-btn:hover { background:#ef9a9a; }
 
@@ -210,7 +217,6 @@
             .time-input{width:120px;}
         }
     </style>
-<!-- PWA 설정 -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#e91e8c">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -221,13 +227,11 @@
 <body>
 <canvas id="particle-canvas"></canvas>
 
-<!-- 연결 상태 -->
 <div id="connection-status">
     <div class="conn-dot syncing" id="conn-dot"></div>
     <span id="conn-text">연결 중...</span>
 </div>
 
-<!-- 저장 모달 -->
 <div class="save-modal-overlay" id="save-modal-overlay">
     <div class="save-modal">
         <div class="modal-icon">✅</div>
@@ -245,14 +249,13 @@
         <button class="top-tab-btn admin" onclick="switchTopTab('admin',this)">📊 관리자 대시보드</button>
     </div>
 
-    <!-- 슷하 -->
     <div id="card-seutha" class="main-card active">
         <div class="sub-tabs">
             <button class="sub-tab-btn active" onclick="switchSubTab('seutha','expense',this)">💰 지출금</button>
             <button class="sub-tab-btn" onclick="switchSubTab('seutha','health',this)">🏃 운동 & 식단</button>
         </div>
         <div id="seutha-expense" class="sub-content active">
-            <div class="date-section"><label>📅 날짜</label><input type="date" id="seutha-expense-date" class="date-input"></div>
+            <div class="date-section"><label>📅 날짜</label><input type="date" id="seutha-expense-date" class="date-input" onchange="renderPersonRecords('seutha','expense')"></div>
             <div class="date-hint">📌 미래 날짜도 미리 입력할 수 있어요!</div>
             <div class="expense-grid">
                 <div class="expense-item"><label>🍚 식비</label><input type="number" id="seutha-food" placeholder="0" min="0"></div>
@@ -260,23 +263,23 @@
                 <div class="expense-item"><label>🚌 교통비</label><input type="number" id="seutha-transport" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>🎬 문화비</label><input type="number" id="seutha-culture" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>👗 의류비</label><input type="number" id="seutha-clothes" placeholder="0" min="0"></div>
-                <div class="expense-item"><label>🎁 경조사비</label><input type="number" id="seutha-event" placeholder="0" min="0"></div> 
+                <div class="expense-item"><label>🧧 경조사비</label><input type="number" id="seutha-event" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>⛪ 헌금</label><input type="number" id="seutha-offering" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>📈 주식</label><input type="number" id="seutha-stock" placeholder="0" min="0"></div>
                 <div class="expense-item"><label>🏦 저축</label><input type="number" id="seutha-saving" placeholder="0" min="0"></div>
             </div>
-            <textarea id="seutha-expense-memo" placeholder="📝 세부 메모 (선택사항)" 
-              style="width:100%;padding:10px;border-radius:10px;border:1.5px solid #ffb7c5;
-              font-size:0.9rem;resize:none;height:60px;margin-top:8px;
-              font-family:inherit;box-sizing:border-box;"></textarea>
+            <div class="expense-memo-wrap">
+                <label>📝 지출 메모</label>
+                <textarea id="seutha-expense-memo" placeholder="상세 지출 내역을 메모해보세요..."></textarea>
+            </div>
             <button class="save-btn seutha-btn" id="seutha-expense-save-btn" onclick="saveExpense('seutha')">💾 저장하기</button>
             <div class="records-section">
-                <h3>📋 최근 지출 기록 <span style="font-size:0.75rem;color:#aaa;font-weight:400">(미래 예정 포함)</span></h3>
+                <h3>📋 오늘 지출 기록</h3>
                 <div id="seutha-expense-records"><div class="loading">불러오는 중...</div></div>
             </div>
         </div>
         <div id="seutha-health" class="sub-content">
-            <div class="date-section"><label>📅 날짜</label><input type="date" id="seutha-health-date" class="date-input"></div>
+            <div class="date-section"><label>📅 날짜</label><input type="date" id="seutha-health-date" class="date-input" onchange="renderPersonRecords('seutha','health')"></div>
             <div class="date-hint">📌 미래 날짜도 미리 입력할 수 있어요!</div>
             <div class="health-tabs-row">
                 <button class="health-tab-btn exercise-tab-btn active" onclick="switchHealthPanel('seutha','exercise-panel',this)">🏋️ 운동</button>
@@ -305,20 +308,19 @@
             </div>
             <button class="save-btn seutha-btn" id="seutha-health-save-btn" onclick="saveHealth('seutha')">💾 저장하기</button>
             <div class="records-section">
-                <h3>📋 최근 운동/식단 기록</h3>
+                <h3>📋 오늘 운동/식단 기록</h3>
                 <div id="seutha-health-records"><div class="loading">불러오는 중...</div></div>
             </div>
         </div>
     </div>
 
-    <!-- 우니 -->
     <div id="card-uni" class="main-card">
         <div class="sub-tabs">
             <button class="sub-tab-btn active" onclick="switchSubTab('uni','expense',this)">💰 지출금</button>
             <button class="sub-tab-btn" onclick="switchSubTab('uni','health',this)">🏃 운동 & 식단</button>
         </div>
         <div id="uni-expense" class="sub-content active">
-            <div class="date-section"><label>📅 날짜</label><input type="date" id="uni-expense-date" class="date-input"></div>
+            <div class="date-section"><label>📅 날짜</label><input type="date" id="uni-expense-date" class="date-input" onchange="renderPersonRecords('uni','expense')"></div>
             <div class="date-hint">📌 미래 날짜도 미리 입력할 수 있어요!</div>
             <div class="expense-grid">
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🍚 식비</label><input type="number" id="uni-food" placeholder="0" min="0" style="border-color:#90caf9"></div>
@@ -326,23 +328,23 @@
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🚌 교통비</label><input type="number" id="uni-transport" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🎬 문화비</label><input type="number" id="uni-culture" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">👗 의류비</label><input type="number" id="uni-clothes" placeholder="0" min="0" style="border-color:#90caf9"></div>
-                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🎁 경조사비</label><input type="number" id="uni-event" placeholder="0" min="0" style="border-color:#90caf9"></div>
+                <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🧧 경조사비</label><input type="number" id="uni-event" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">⛪ 헌금</label><input type="number" id="uni-offering" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">📈 주식</label><input type="number" id="uni-stock" placeholder="0" min="0" style="border-color:#90caf9"></div>
                 <div class="expense-item" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb)"><label style="color:#01579b">🏦 저축</label><input type="number" id="uni-saving" placeholder="0" min="0" style="border-color:#90caf9"></div>
             </div>
-            <textarea id="uni-expense-memo" placeholder="📝 세부 메모 (선택사항)"
-                style="width:100%;padding:10px;border-radius:10px;border:1.5px solid #81d4fa;
-                font-size:0.9rem;resize:none;height:60px;margin-top:8px;
-                font-family:inherit;box-sizing:border-box;"></textarea>
+            <div class="expense-memo-wrap">
+                <label>📝 지출 메모</label>
+                <textarea id="uni-expense-memo" placeholder="상세 지출 내역을 메모해보세요..."></textarea>
+            </div>
             <button class="save-btn uni-btn" id="uni-expense-save-btn" onclick="saveExpense('uni')">💾 저장하기</button>
             <div class="records-section">
-                <h3>📋 최근 지출 기록 <span style="font-size:0.75rem;color:#aaa;font-weight:400">(미래 예정 포함)</span></h3>
+                <h3>📋 오늘 지출 기록</h3>
                 <div id="uni-expense-records"><div class="loading">불러오는 중...</div></div>
             </div>
         </div>
         <div id="uni-health" class="sub-content">
-            <div class="date-section"><label>📅 날짜</label><input type="date" id="uni-health-date" class="date-input"></div>
+            <div class="date-section"><label>📅 날짜</label><input type="date" id="uni-health-date" class="date-input" onchange="renderPersonRecords('uni','health')"></div>
             <div class="date-hint">📌 미래 날짜도 미리 입력할 수 있어요!</div>
             <div class="health-tabs-row">
                 <button class="health-tab-btn exercise-tab-btn active" onclick="switchHealthPanel('uni','exercise-panel',this)">🏋️ 운동</button>
@@ -371,13 +373,12 @@
             </div>
             <button class="save-btn uni-btn" id="uni-health-save-btn" onclick="saveHealth('uni')">💾 저장하기</button>
             <div class="records-section">
-                <h3>📋 최근 운동/식단 기록</h3>
+                <h3>📋 오늘 운동/식단 기록</h3>
                 <div id="uni-health-records"><div class="loading">불러오는 중...</div></div>
             </div>
         </div>
     </div>
 
-    <!-- 관리자 -->
     <div id="card-admin" class="main-card">
         <div class="admin-section">
             <h2>📊 지출 통계</h2>
@@ -504,7 +505,7 @@ const EXPENSE_CATEGORIES = [
     { key:'transport', label:'🚌 교통비', color:'#90caf9' },
     { key:'culture',   label:'🎬 문화비', color:'#80cbc4' },
     { key:'clothes',   label:'👗 의류비', color:'#ffcc80' },
-    { key:'event',     label:'🎁 경조사비', color:'#ff6e6e' },
+    { key:'event',     label:'🧧 경조사비',color:'#ff8a80' },
     { key:'offering',  label:'⛪ 헌금',   color:'#a5d6a7' },
     { key:'stock',     label:'📈 주식',   color:'#ef9a9a' },
     { key:'saving',    label:'🏦 저축',   color:'#b0bec5' },
@@ -654,11 +655,12 @@ function setSyncing(on) {
 // ✅ 낙관적 업데이트 - 지출 저장
 // =============================================
 async function saveExpense(person) {
-    const date = document.getElementById(`${person}-expense-date`).value;
+    const dateInput = document.getElementById(`${person}-expense-date`);
+    const date = dateInput.value;
     if(!date){ showToast('날짜를 선택해주세요!'); return; }
 
-    const memo = document.getElementById(`${person}-expense-memo`).value.trim();
-    const data = { date, person, type:'expense', createdAt:Date.now(),memo };
+    const memoVal = document.getElementById(`${person}-expense-memo`).value.trim();
+    const data = { date, person, type:'expense', memo: memoVal, createdAt:Date.now() };
     let hasData = false;
     EXPENSE_CATEGORIES.forEach(cat => {
         const val = parseInt(document.getElementById(`${person}-${cat.key}`).value)||0;
@@ -675,7 +677,7 @@ async function saveExpense(person) {
     renderPersonRecords(person,'expense');
     if(document.getElementById('card-admin').classList.contains('active')) renderAdminFromCache();
 
-    // ✅ 2. 입력창 즉시 초기화
+    // ✅ 2. 입력창 및 메모 영역 초기화 (날짜는 필터 상태 유지를 위해 선택값을 그대로 유지합니다)
     EXPENSE_CATEGORIES.forEach(cat=>{ document.getElementById(`${person}-${cat.key}`).value=''; });
     document.getElementById(`${person}-expense-memo`).value = '';
 
@@ -703,7 +705,8 @@ async function saveExpense(person) {
 // ✅ 낙관적 업데이트 - 운동/식단 저장
 // =============================================
 async function saveHealth(person) {
-    const date = document.getElementById(`${person}-health-date`).value;
+    const dateInput = document.getElementById(`${person}-health-date`);
+    const date = dateInput.value;
     if(!date){ showToast('날짜를 선택해주세요!'); return; }
 
     const fields = {
@@ -753,29 +756,19 @@ async function saveHealth(person) {
 // ✅ 캐시 기반 렌더링 (즉시!)
 // =============================================
 function getFilteredRecords(person, type) {
+    // 지정된 날짜 불러오기
+    const targetDate = document.getElementById(`${person}-${type}-date`).value;
+    
     return Object.values(localCache)
-        .filter(r => r.person===person && r.type===type)
-        .sort((a,b) => b.date.localeCompare(a.date) || b.createdAt-a.createdAt);
+        .filter(r => r.person===person && r.type===type && r.date === targetDate) // 💡 선택한 날짜와 정확히 일치하는 내역만 필터링
+        .sort((a,b) => b.createdAt-a.createdAt);
 }
 
 function renderPersonRecords(person, type) {
     const container = document.getElementById(`${person}-${type}-records`);
+    const records   = getFilteredRecords(person, type);
+    if(records.length===0){ container.innerHTML='<div class="empty-msg">지정된 날짜에 기록된 내역이 없습니다 😊</div>'; return; }
     const today = getTodayStr();
-
-    let records = getFilteredRecords(person, type);
-
-    // ✅ 지출 기록은 오늘 날짜만 표시
-    if(type === 'expense') {
-        records = records.filter(r => r.date === today).slice(0, 15);
-    } else {
-        records = records.slice(0, 15);
-    }
-
-    if(records.length === 0){
-        container.innerHTML = '<div class="empty-msg">아직 기록이 없어요 😊</div>';
-        return;
-    }
-
     container.innerHTML = '';
     records.forEach(d => {
         const div = document.createElement('div');
@@ -786,10 +779,7 @@ function renderPersonRecords(person, type) {
             EXPENSE_CATEGORIES.forEach(cat => {
                 if(d[cat.key]>0){ tags+=`<span class="record-tag">${cat.label} ${formatWon(d[cat.key])}</span>`; total+=d[cat.key]; }
             });
-            // ✅ 메모 표시
-            const memoHtml = d.memo
-                ? `<div class="record-memo">📝 ${d.memo}</div>`
-                : '';
+            let memoHtml = d.memo ? `<div class="record-memo">📝 ${d.memo}</div>` : '';
             div.innerHTML=`
                 <div class="record-date">📅 ${d.date}${fut?'<span class="future-badge">예정</span>':''}
                     <span style="color:#e91e8c;font-size:0.83rem"> 합계: ${formatWon(total)}</span>
@@ -812,7 +802,6 @@ function renderPersonRecords(person, type) {
         container.appendChild(div);
     });
 }
-
 
 // =============================================
 // 삭제 (낙관적)
@@ -866,7 +855,6 @@ async function resetAllData() {
 
 // =============================================
 // ✅ 관리자 - 캐시 기반 즉시 렌더링
-// (미래 날짜도 기간 내 포함하여 반영)
 // =============================================
 let seuthaPieChart=null, uniPieChart=null, compareBarChart=null;
 
@@ -874,7 +862,6 @@ function renderAdminFromCache() {
     const { startDate, endDate } = currentFilter;
     const all = Object.values(localCache);
 
-    // ✅ 미래 날짜 포함 - 기간 내 모든 날짜 반영
     const filterByDate = r => {
         if(!startDate && !endDate) return true;
         if(startDate && r.date < startDate) return false;
@@ -917,11 +904,13 @@ function processAdminExpense(person, all, filterFn) {
         EXPENSE_CATEGORIES.forEach(cat => {
             if(r[cat.key]>0){ tags+=`<span class="ar-tag">${cat.label} ${formatWon(r[cat.key])}</span>`; total+=r[cat.key]; }
         });
+        let memoHtml = r.memo ? `<div class="ar-memo">📝 ${r.memo}</div>` : '';
         const div = document.createElement('div');
         div.className = 'admin-record-item'+(fut?' future-item':'');
         div.innerHTML=`
             <div class="ar-date">📅 ${r.date}${fut?'<span class="future-badge" style="margin-left:5px">예정</span>':''} — 합계: ${formatWon(total)}</div>
             <div class="ar-tags">${tags}</div>
+            ${memoHtml}
             <button class="ar-delete-btn" onclick="adminDeleteRecord('${r.id}')">🗑 삭제</button>`;
         listEl.appendChild(div);
     });
@@ -974,7 +963,6 @@ function drawPieChart(person, catTotals) {
 function drawCompareChart(all) {
     const sT=new Array(COMPARE_MONTHS.length).fill(0);
     const uT=new Array(COMPARE_MONTHS.length).fill(0);
-    // ✅ 미래 예정 지출도 월별 비교에 포함
     all.filter(r=>r.type==='expense').forEach(d=>{
         const idx=COMPARE_MONTHS.indexOf(d.date.substring(0,7));
         if(idx===-1) return;
@@ -1040,7 +1028,6 @@ function initParticles() {
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      // ↓ 경로 수정!
       navigator.serviceWorker.register('/starwooni/sw.js')
         .then(() => console.log('✅ PWA 등록 완료'))
         .catch(e => console.log('❌ 오류:', e));
